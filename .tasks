@@ -1,0 +1,159 @@
+DONE - Create accounts
+DONE - Initiate account with first deposit of the account amount
+DONE - View account and add transaction form
+DONE - Transaction approval 
+DONE - receipt generation
+DONE - Generate statements 
+DONE - Create transactions for accounts
+- Reports
+
+- Upload attachments to individual accounts 
+- Sending statements to clients (investors and borrowers) via emails on the first day of each month 
+
+DONE - Run first three clients in the system and generate statements
+
+// LETTERHEAD
+
+DONE - Account Number
+DONE - Account Owner's Name
+DONE - Address - Client details
+
+DONE - Statement Period
+DONE - Opening Balance
+DONE - Total Cash Contributions
+- Total Cash Withdrawals { On Principal -> On Interest }
+DONE - Total Principal
+DONE - Interest Rate - 18%
+DONE - Interest Earned this month -->
+DONE - Total Interest Earned
+DONE - Closing Balance
+
+// Investment Activities
+DONE - Deposits
+DONE - Withdrawals
+DONE - Interest Earning - 1st of each month
+
+DONE - Add date to deposit form and withdraw form
+DONE - Add payment methods too
+DONE - Add account type -- accepts deposits and currency fields in
+- Add unit trust account
+- Generate statement
+
+DONE - Calculate interest / per anum --> per day by 365
+
+// ON DASHBOARD SHOW 
+- Total Investments Received
+- Total interest paid
+- Total loans disbursed
+- Total interest earned
+
+// ADDITIONAL TASKS
+DONE - Annual interest due date calculation
+DONE - Create a loan interest accrual account where interest will be allocated daily to every account 
+DONE - Automatically charge interest at a rate eg. 5.5% => like this: (5.5% per month / 30 ) * todays_balance = interest_charged
+-- Editing cash amount after approval
+-- If there's a mistake during deposit or withdraw restore the submit button so the user can try again
+-- Adding deductions (rates) when a loan is issued, make them optional so they're added by the admin as the amounts may change
+DONE - Amortization schedule for loan accounts
+- Account types for loans drop down
+DONE - One time Interest (One time at the end of the period) 
+- Amortized Loans (allocated daily for monthly or annual client loans)
+	- Simple Interest (not reducing balance)
+	- Compound Interest (reducing balance)
+- Invoice discounting
+	- Invoice amount
+	- Discount rate (e.g. 10%)
+- Account types for deposits
+DONE - Interest earned monthly based on daily balance 
+- Adding attachments to client accounts
+- New clients on-boarding, clients data should be displayed on the approval page
+- Adding receipt numbers from the accounting module
+DONE - Making account numbers shorter
+
+// ADDITIONAL FEEDBACK
+- can we put the email send receipt with mini statement and thank you message
+DONE - delete transactions button
+- merging loans on top up - only works when there's an outstanding balance
+DONE - Clients sometimes make one payment for multiple loans -- allocation using FIFO method perhaps? - have multiple accounts for single client then let the client specify which account they are paying for
+DONE - loans with zero interest should allow deposits
+
+// SQL
+ALTER TABLE `comments`
+	CHANGE COLUMN `account` `account` INT(11) NULL DEFAULT NULL AFTER `closing_balance`,
+	CHANGE COLUMN `comment` `comment` VARCHAR(5000) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `post_type`,
+	CHANGE COLUMN `user_id` `user_id` INT(11) NULL DEFAULT NULL AFTER `comment`,
+	CHANGE COLUMN `email` `email` VARCHAR(255) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `name`,
+	CHANGE COLUMN `last_modified` `last_modified` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP AFTER `created_at`,
+	CHANGE COLUMN `parent_id` `parent_id` INT(11) NULL DEFAULT '0' AFTER `last_modified`,
+	CHANGE COLUMN `uuid` `uuid` VARCHAR(50) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `parent_id`,
+	CHANGE COLUMN `comment` `comment` VARCHAR(5000) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `trans_type`,
+	CHANGE COLUMN `currency` `currency` VARCHAR(10) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `trans_date`,
+	CHANGE COLUMN `amount` `amount` BIGINT(50) NULL DEFAULT NULL AFTER `currency`,
+	CHANGE COLUMN `opening_balance` `opening_balance` BIGINT(50) NULL DEFAULT '0' AFTER `amount`,
+	CHANGE COLUMN `closing_balance` `closing_balance` BIGINT(50) NULL DEFAULT '0' AFTER `opening_balance`,
+	CHANGE COLUMN `payment_method` `payment_method` INT(10) NULL DEFAULT NULL AFTER `closing_balance`;
+
+ALTER TABLE `transaction`
+	CHANGE COLUMN `opening_balance` `opening_balance` DOUBLE(22,0) NULL DEFAULT NULL AFTER `note`,
+	CHANGE COLUMN `bal` `bal` DOUBLE(22,0) NULL DEFAULT NULL AFTER `closing_balance`;
+
+ALTER TABLE `comments`
+	ADD COLUMN `category` VARCHAR(10) NULL DEFAULT NULL AFTER `trans_type`,
+	CHANGE COLUMN `category` `category` VARCHAR(30) NULL DEFAULT NULL COLLATE 'utf8_general_ci' AFTER `trans_type`;
+
+
+// EMAIL NOTIFICATIONS TO CLIENTS
+- Use stewardscreditservices@gmail.com with app password to send emails via gmail smtp
+
+- Add withdrawal categories for deposit accounts 
+	- Redemption
+	- Interest Payment - make the switch disappear if interest is zero
+	- Both interest and principal
+
+ALTER TABLE `users`
+	ADD COLUMN `address` VARCHAR(255) NULL DEFAULT NULL AFTER `token`,
+	ADD COLUMN `address2` VARCHAR(255) NULL DEFAULT NULL AFTER `address`;
+
+ALTER TABLE `users`
+	ADD COLUMN `city` VARCHAR(255) NULL DEFAULT NULL AFTER `address2`,
+	ADD COLUMN `zipcode` VARCHAR(255) NULL DEFAULT NULL AFTER `city`,
+	ADD COLUMN `country` VARCHAR(255) NULL DEFAULT NULL AFTER `zipcode`;
+
+
+SEARCH FOR CLIENTS
+DONE - Now that there's lots of clients can we search by name and click to go to a client account
+- Can we add the new loan and new deposit account button on the clients page
+- Clients page tabs Accounts, Client details, Client report 
+
+ALERTS FOR USERS 
+DONE - Alert creation interface
+- Create alerts table in database
+- Send email alert when the time to pay comes
+
+- Edit transactions interface - change amount 
+
+- Add account name to account creation form
+
+
+************************************************************************************************************
+
+ALTER TABLE `comments`
+	CHANGE COLUMN `amount` `amount` DOUBLE(30,4) NULL DEFAULT NULL AFTER `currency`,
+	CHANGE COLUMN `opening_balance` `opening_balance` DOUBLE(30,4) NULL DEFAULT NULL AFTER `amount`,
+	CHANGE COLUMN `closing_balance` `closing_balance` DOUBLE(30,4) NULL DEFAULT NULL AFTER `opening_balance`;
+
+
+ALTER TABLE `transaction`
+	CHANGE COLUMN `amount` `amount` DOUBLE(30,4) NULL DEFAULT NULL AFTER `category`,
+	CHANGE COLUMN `opening_balance` `opening_balance` DOUBLE(30,4) NULL DEFAULT NULL AFTER `note`,
+	CHANGE COLUMN `dr` `dr` DOUBLE(30,4) NULL DEFAULT NULL AFTER `opening_balance`,
+	CHANGE COLUMN `cr` `cr` DOUBLE(30,4) NULL DEFAULT NULL AFTER `dr`,
+	CHANGE COLUMN `closing_balance` `closing_balance` DOUBLE(30,4) NULL DEFAULT NULL AFTER `cr`,
+	CHANGE COLUMN `bal` `bal` DOUBLE(30,4) NULL DEFAULT NULL AFTER `closing_balance`;
+
+
+ALTER TABLE `posts`
+	CHANGE COLUMN `amount` `amount` DOUBLE(30,4) NULL DEFAULT NULL AFTER `user_id`,
+	CHANGE COLUMN `balance` `balance` DOUBLE(30,4) NULL DEFAULT NULL AFTER `amount`;
+
+
