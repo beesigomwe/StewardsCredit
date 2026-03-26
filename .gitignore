@@ -23,6 +23,12 @@ user_guide_src/cilexer/build/*
 user_guide_src/cilexer/dist/*
 user_guide_src/cilexer/pycilexer.egg-info/*
 
+# SECURITY: Never commit credentials or environment-specific configs
+.env
+*.env
+application/config/database.php
+backoffice/application/config/database.php
+
 # IDE Files
 #-------------------------
 /nbproject/

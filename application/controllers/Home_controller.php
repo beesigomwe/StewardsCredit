@@ -579,8 +579,25 @@ class Home_controller extends Home_Core_Controller{
 		if ($this->general_settings->comment_system != 1) {
 			exit();
 		}
-		$limit = $this->input->post('limit', true);
+		$limit   = $this->input->post('limit', true);
 		$post_id = $this->input->post('post_id', true);
+
+		// LOAN TOP-UP MERGE: If the merge_topup flag is set, add the outstanding
+		// balance to the submitted amount before recording the transaction.
+		$merge_topup = $this->input->post('merge_topup', true);
+		if ($merge_topup == '1' && !empty($post_id)) {
+			$account = $this->post_model->get_post_by_id($post_id);
+			if ($account && isset($account->balance) && $account->balance != 0) {
+				$new_amount  = (float) str_replace(',', '', $this->input->post('amount', true));
+				$outstanding = abs((float)$account->balance);
+				// Inject the merged amount into POST for add_comment to pick up
+				$_POST['amount']  = $new_amount + $outstanding;
+				$_POST['comment'] = trim($this->input->post('comment', true))
+					. ' [Top-up merged with outstanding balance of '
+					. $account->currency . ' ' . number_format($outstanding, 2) . ']';
+			}
+		}
+
 		if (auth_check()) {
 			$this->comment_model->add_comment();
 		} else {

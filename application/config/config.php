@@ -225,7 +225,8 @@ $config['allow_get_array'] = TRUE;
 | your log files will fill up very fast.
 |
 */
-$config['log_threshold'] = 4;
+// PRODUCTION: Use log level 1 (errors only) in production, 4 (all) in development
+$config['log_threshold'] = (ENVIRONMENT === 'production') ? 1 : 4;
 
 /*
 |--------------------------------------------------------------------------
@@ -405,8 +406,9 @@ $config['sess_regenerate_destroy'] = FALSE;
 $config['cookie_prefix'] = '';
 $config['cookie_domain'] = '';
 $config['cookie_path'] = '/';
-$config['cookie_secure'] = FALSE;
-$config['cookie_httponly'] = FALSE;
+// PRODUCTION: Enable secure & httponly cookies when running over HTTPS
+$config['cookie_secure']   = (ENVIRONMENT === 'production' && isset($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off');
+$config['cookie_httponly'] = TRUE; // Always enable httponly to block XSS cookie theft
 
 /*
 |--------------------------------------------------------------------------

@@ -100,29 +100,27 @@ class AdminModel extends CI_Model{
 		return $result;
 	} 
 
-	//method for calculating balance
-	public function getBalance($account,$amount,$action) {
-		if($action=='add'){
-			//get last balance
-			$query=$this->db->query("SELECT bal FROM transaction 
-				WHERE accounts_name='".$account."' ORDER BY
-				trans_id DESC LIMIT 1");
-			$result=$query->row();
-			if(isset($result->bal)){
-				return $result->bal-$amount;	
-			}
-			return 0-$amount;
-		}else if($action=='sub'){
-			//get last balance
-			$query=$this->db->query("SELECT bal FROM transaction 
-				WHERE accounts_name='".$account."' ORDER BY
-				trans_id DESC LIMIT 1");
-			$result=$query->row();
-			if(isset($result->bal)){
-				return $result->bal-$amount;	
-			}
-			return 0-$amount;
+	/**
+	 * FIX: Corrected balance calculation logic.
+	 * - 'add' now correctly ADDS the amount to the previous balance (was incorrectly subtracting).
+	 * - 'sub' correctly SUBTRACTS the amount.
+	 * - Replaced raw SQL query string with Query Builder to prevent SQL injection.
+	 */
+	public function getBalance($account, $amount, $action) {
+		$this->db->select('bal');
+		$this->db->where('accounts_name', $account);
+		$this->db->order_by('trans_id', 'DESC');
+		$this->db->limit(1);
+		$query = $this->db->get('transaction');
+		$result = $query->row();
+		$last_bal = isset($result->bal) ? (float)$result->bal : 0;
+
+		if ($action == 'add') {
+			return $last_bal + $amount;
+		} else if ($action == 'sub') {
+			return $last_bal - $amount;
 		}
+		return $last_bal;
 	}
 
 

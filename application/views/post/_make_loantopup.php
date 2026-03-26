@@ -66,15 +66,38 @@ if(isset($post->currency) && $post->currency == 'UGX'){
 					</div>
 				</div>
 			</div>
-			<div class="row">
-				<div class="col-12">
-					<div class="form-group">
-						<label class="control-label">Narration</label>
-						<textarea name="comment" class="form-control form-input form-textarea" placeholder="<?= trans("leave_your_comment"); ?>"></textarea>
+		<div class="row">
+			<div class="col-12">
+				<div class="form-group">
+					<label class="control-label">Narration</label>
+					<textarea name="comment" class="form-control form-input form-textarea" placeholder="<?= trans("leave_your_comment"); ?>"></textarea>
+				</div>
+			</div>
+		</div>
+		<!-- LOAN TOP-UP MERGE OPTION -->
+		<?php
+		$outstanding = 0;
+		if(isset($post->balance)) $outstanding = (float)$post->balance;
+		?>
+		<?php if($outstanding != 0): ?>
+		<div class="row">
+			<div class="col-12">
+				<div class="alert alert-info py-2 mb-2">
+					<strong>Outstanding Balance:</strong> <?= html_escape($post->currency) ?> <?= number_format(abs($outstanding), 2) ?>
+				</div>
+				<div class="form-group">
+					<div class="custom-control custom-checkbox">
+						<input type="checkbox" class="custom-control-input" id="merge_topup" name="merge_topup" value="1">
+						<label class="custom-control-label" for="merge_topup">
+							<strong>Merge with outstanding balance</strong>
+							<small class="text-muted d-block">Tick this to add the new loan amount on top of the existing outstanding balance of <?= html_escape($post->currency) ?> <?= number_format(abs($outstanding), 2) ?>.</small>
+						</label>
 					</div>
 				</div>
 			</div>
-			<button type="submit" class="btn btn-md btn-custom"><?= trans("post_comment"); ?></button>
+		</div>
+		<?php endif; ?>
+		<button type="submit" class="btn btn-md btn-custom"><?= trans("post_comment"); ?></button>
 			<div id="message-comment-result" class="message-comment-result"></div>
 		</form>
 	</div>

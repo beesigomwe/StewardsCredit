@@ -65,7 +65,8 @@ class Comment_model extends CI_Model {
 		if($end == '' || date('y-m-d', strtotime($end)) == '1970-01-01'){
 			return 365;
 		}
-		return (strtotime($end) - strtotime($start));
+		// FIX: Return difference in days, not seconds
+		return (int) round((strtotime($end) - strtotime($start)) / 86400);
 	}
 
 	//add comment
@@ -330,28 +331,30 @@ class Comment_model extends CI_Model {
 		$opening_balance = $this->getopeningbalance($account_id);
 		$closing_balance = $this->getclosingbalance($opening_balance, "CR", $amount, $account_id);
 
+		// FIX: Removed duplicate 'type' key. 'type' now holds the ledger direction (Income/Expense)
+		// and 'trans_type' holds the CR/DR direction for account-level logic.
 		$transaction = [
 			"accounts_name" => $this->auth_model->get_fullname($details->userid),
 			'uuid' => $details->uuid,
 			"account_id" => $details->post_id,
-			"type" => "CR",	
-			"category" => "1",
 			"type" => "Income",
+			"trans_type" => "CR",
+			"category" => "1",
 			"currency" => $details->currency,
 			"payer" => $details->userid,
-			"payer_id" => $details->userid,	
+			"payer_id" => $details->userid,
 			"payee" => $details->account,
 			"payee_id" => $details->account,
-			"p_method" => $details->payment_method,	
+			"p_method" => $details->payment_method,
 			"ref" => $details->id,
 			"note" => $details->comment,
-			"trans_date" => date('y-m-d', strtotime($details->trans_date)),
-			"startdate" => date('y-m-d', strtotime($details->startdate)),
-			"enddate" => date('y-m-d', strtotime($details->enddate)),
+			"trans_date" => date('Y-m-d', strtotime($details->trans_date)),
+			"startdate" => date('Y-m-d', strtotime($details->startdate)),
+			"enddate" => date('Y-m-d', strtotime($details->enddate)),
 			"rate_type" => $details->rate_type,
 			"interestrate" => $details->interestrate,
 			"scheduled" => "0",
-			"dr" => 0, //TODO: Add transaction fees 
+			"dr" => 0,
 			"cr" => $details->amount,
 			"amount" => $details->amount,
 			"bal" => $this->getaccountbalance($details->payment_method, "CR", $details->amount),
@@ -370,24 +373,26 @@ class Comment_model extends CI_Model {
 		$opening_balance = $this->getopeningbalance($account_id);
 		$closing_balance = $this->getclosingbalance($opening_balance, "DR", $amount, $account_id);
 
+		// FIX: Removed duplicate 'type' key. 'type' now holds the ledger direction (Income/Expense)
+		// and 'trans_type' holds the CR/DR direction for account-level logic.
 		$transaction = [
 			"accounts_name" => $this->auth_model->get_fullname($details->userid),
 			'uuid' => $details->uuid,
 			"account_id" => $details->post_id,
-			"type" => "DR",	
-			"category" => "1",	
 			"type" => "Expense",
+			"trans_type" => "DR",
+			"category" => "1",
 			"currency" => $details->currency,
 			"payer" => $details->userid,
-			"payer_id" => $details->userid,	
+			"payer_id" => $details->userid,
 			"payee" => $details->account,
 			"payee_id" => $details->account,
-			"p_method" => $details->payment_method,	
+			"p_method" => $details->payment_method,
 			"ref" => $details->id,
 			"note" => $details->comment,
-			"trans_date" => $details->trans_date,
-			"startdate" => $details->startdate,
-			"enddate" => $details->enddate,
+			"trans_date" => date('Y-m-d', strtotime($details->trans_date)),
+			"startdate" => date('Y-m-d', strtotime($details->startdate)),
+			"enddate" => date('Y-m-d', strtotime($details->enddate)),
 			"rate_type" => $details->rate_type,
 			"interestrate" => $details->interestrate,
 			"scheduled" => "0",
@@ -423,6 +428,44 @@ class Comment_model extends CI_Model {
 			break;
 		}
 		return $balance;
+	}
+
+	/**
+	 * Get a single transaction (comment) by its ID for editing.
+	 */
+	public function get_transaction_by_id($id) {
+		$this->db->where('id', $id);
+		$this->db->limit(1);
+		$query = $this->db->get('comments');
+		return $query->row();
+	}
+
+	/**
+	 * Update a pending transaction's amount and date.
+	 * Only pending (status=0) transactions may be edited to prevent ledger tampering.
+	 * After update, recalculates the opening/closing balance.
+	 */
+	public function update_transaction($id, $amount, $trans_date, $note = '') {
+		$comment = $this->get_transaction_by_id($id);
+		if (!$comment || $comment->status != 0) {
+			return false; // Only allow editing pending transactions
+		}
+		$amount = (double) str_replace(',', '', $amount);
+		$opening_balance = $this->getopeningbalance($comment->post_id);
+		$closing_balance = $this->getclosingbalance($opening_balance, $comment->trans_type, $amount);
+		$data = [
+			'amount'          => $amount,
+			'trans_date'      => date('Y-m-d', strtotime($trans_date)),
+			'opening_balance' => $opening_balance,
+			'closing_balance' => $closing_balance,
+			'last_modified'   => date('Y-m-d H:i:s'),
+		];
+		if (!empty($note)) {
+			$data['comment'] = $note;
+		}
+		$this->db->where('id', $id);
+		$this->db->limit(1);
+		return $this->db->update('comments', $data);
 	}
 
 	//delete transaction

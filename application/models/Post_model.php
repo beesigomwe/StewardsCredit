@@ -92,20 +92,26 @@ class Post_model extends CI_Model{
 		}
 		$interestperiod = $post->interestperiod;
 
+		// FIX: Added default case to prevent undefined $rate variable for unknown periods.
+		// Daily and Weekly modes added; default falls back to 0 (no interest).
+		$rate = 0;
 		switch ($interestperiod) {
 			case 'Annually':
-			if($post->category_id == 1){
-				$rate = $interestrate / 36400;
-			}else{
-				$rate = $interestrate / 36500;
-			}
+				$rate = ($post->category_id == 1) ? $interestrate / 36400 : $interestrate / 36500;
 			break;
 			case 'Monthly':
-			if($post->category_id == 1){
-				$rate = $interestrate * 12 / 36400;
-			}else{
-				$rate = $interestrate * 12 / 36500;
-			}
+				$rate = ($post->category_id == 1) ? $interestrate * 12 / 36400 : $interestrate * 12 / 36500;
+			break;
+			case 'Weekly':
+				$rate = ($post->category_id == 1) ? $interestrate * 52 / 36400 : $interestrate * 52 / 36500;
+			break;
+			case 'Daily':
+				$rate = ($post->category_id == 1) ? $interestrate / 364 : $interestrate / 365;
+			break;
+			default:
+				// Unknown interest period — log and skip interest calculation
+				log_message('error', 'calculateinterest: Unknown interestperiod "' . $interestperiod . '" for post_id ' . $post_id);
+				$rate = 0;
 			break;
 		}
 
@@ -212,8 +218,27 @@ class Post_model extends CI_Model{
 		return 0;
 	}
 
-	private function closeaccount(){
-
+	/**
+	 * FIX: Implemented account closure logic.
+	 * Marks a loan account as closed (status = 2) when the outstanding balance reaches zero.
+	 * @param int $account_id The post/account ID to close.
+	 */
+	private function closeaccount($account_id){
+		if(empty($account_id)) return;
+		// Only close if not already closed
+		$this->db->select('id, status');
+		$this->db->where('id', $account_id);
+		$this->db->limit(1);
+		$query = $this->db->get('posts');
+		$post = $query->row();
+		if($post && $post->status != 2){
+			$this->db->where('id', $account_id);
+			$this->db->update('posts', [
+				'status' => 2, // 2 = closed
+				'last_modified' => date('Y-m-d H:i:s')
+			]);
+			log_message('info', 'closeaccount: Account ID ' . $account_id . ' has been closed (balance reached zero).');
+		}
 	}
 
 	public function uuid($data = null){

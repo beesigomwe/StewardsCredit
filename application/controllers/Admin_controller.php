@@ -284,6 +284,44 @@ class Admin_controller extends Admin_Core_Controller{
     }
 
     /**
+     * Get Transaction JSON (AJAX)
+     * Returns a single pending transaction's data as JSON for the edit modal.
+     */
+    public function get_transaction_json() {
+        $id = $this->input->get('id', true);
+        $transaction = $this->comment_model->get_transaction_by_id($id);
+        if ($transaction && $transaction->status == 0) {
+            echo json_encode(['success' => true, 'data' => $transaction]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Transaction not found or already approved.']);
+        }
+    }
+
+    /**
+     * Edit Transaction (POST)
+     * Updates the amount and date of a pending transaction.
+     * Only pending (status=0) transactions may be edited.
+     */
+    public function edit_transaction_post() {
+        $id         = $this->input->post('id', true);
+        $amount     = $this->input->post('amount', true);
+        $trans_date = $this->input->post('trans_date', true);
+        $note       = $this->input->post('note', true);
+
+        if (empty($id) || empty($amount) || empty($trans_date)) {
+            echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            return;
+        }
+
+        $result = $this->comment_model->update_transaction($id, $amount, $trans_date, $note);
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Transaction updated successfully.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Update failed. Only pending transactions can be edited.']);
+        }
+    }
+
+    /**
      * Delete Selected Comments
      */
     public function delete_selected_comments()
@@ -927,5 +965,171 @@ class Admin_controller extends Admin_Core_Controller{
         $this->load->view('email/email_newsletter', $data);
     }
 
+    /**
+     * Upload Attachment (POST)
+     * Handles file uploads for client account attachments.
+     */
+    public function upload_attachment_post() {
+        if (!auth_check() || !is_admin()) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorised.']);
+            return;
+        }
+        $post_id = $this->input->post('post_id', true);
+        $file_name_label = $this->input->post('file_name', true);
+        if (empty($post_id) || empty($file_name_label)) {
+            echo json_encode(['success' => false, 'message' => 'Missing required fields.']);
+            return;
+        }
+        $upload_path = FCPATH . 'uploads/attachments/' . $post_id . '/';
+        if (!is_dir($upload_path)) {
+            mkdir($upload_path, 0755, true);
+        }
+        $config = [
+            'upload_path'   => $upload_path,
+            'allowed_types' => 'pdf|jpg|jpeg|png|doc|docx|xls|xlsx',
+            'max_size'      => 5120, // 5MB
+            'encrypt_name'  => TRUE,
+        ];
+        $this->load->library('upload', $config);
+        if (!$this->upload->do_upload('attachment')) {
+            echo json_encode(['success' => false, 'message' => $this->upload->display_errors('', '')]);
+            return;
+        }
+        $upload_data = $this->upload->data();
+        $relative_path = 'uploads/attachments/' . $post_id . '/' . $upload_data['file_name'];
+        $ext = strtolower($upload_data['file_ext']);
+        $data = [
+            'post_id'    => $post_id,
+            'user_id'    => user()->id,
+            'file_name'  => $file_name_label,
+            'file_path'  => $relative_path,
+            'file_type'  => ltrim($ext, '.'),
+            'file_size'  => $upload_data['file_size'] * 1024,
+            'created_at' => date('Y-m-d H:i:s'),
+        ];
+        $this->db->insert('account_attachments', $data);
+        $attachment_id = $this->db->insert_id();
+        echo json_encode([
+            'success'       => true,
+            'message'       => 'File uploaded successfully.',
+            'attachment_id' => $attachment_id,
+            'file_name'     => html_escape($file_name_label),
+            'file_url'      => base_url($relative_path),
+            'file_type'     => ltrim($ext, '.'),
+            'file_size'     => $upload_data['file_size'] * 1024,
+        ]);
+    }
 
+    /**
+     * Delete Attachment (POST)
+     * Removes an attachment file and its database record.
+     */
+    public function delete_attachment_post() {
+        if (!auth_check() || !is_admin()) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorised.']);
+            return;
+        }
+        $attachment_id = $this->input->post('attachment_id', true);
+        $post_id       = $this->input->post('post_id', true);
+        $this->db->where('attachment_id', $attachment_id);
+        $this->db->where('post_id', $post_id); // extra safety check
+        $query = $this->db->get('account_attachments');
+        $att = $query->row();
+        if (!$att) {
+            echo json_encode(['success' => false, 'message' => 'Attachment not found.']);
+            return;
+        }
+        // Delete the physical file
+        $full_path = FCPATH . $att->file_path;
+        if (file_exists($full_path)) {
+            unlink($full_path);
+        }
+        $this->db->where('attachment_id', $attachment_id);
+        $this->db->delete('account_attachments');
+        echo json_encode(['success' => true, 'message' => 'Attachment deleted.']);
+    }
+
+    /**
+     * Update Client Details (POST)
+     * Saves editable client profile fields from the account details tab.
+     */
+    public function update_client_details_post() {
+        if (!auth_check() || !is_admin()) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorised.']);
+            return;
+        }
+        $user_id = $this->input->post('user_id', true);
+        if (empty($user_id)) {
+            echo json_encode(['success' => false, 'message' => 'User ID missing.']);
+            return;
+        }
+        $allowed_fields = ['firstname', 'lastname', 'email', 'mobile', 'address', 'address2', 'city', 'zipcode', 'country', 'about_me'];
+        $data = [];
+        foreach ($allowed_fields as $field) {
+            $val = $this->input->post($field, true);
+            if ($val !== null) {
+                $data[$field] = $val;
+            }
+        }
+        if (empty($data)) {
+            echo json_encode(['success' => false, 'message' => 'No data to update.']);
+            return;
+        }
+        $this->db->where('id', $user_id);
+        $this->db->limit(1);
+        $result = $this->db->update('users', $data);
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Client details updated successfully.']);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Update failed. Please try again.']);
+        }
+    }
+
+    /**
+     * Send eStatement (POST)
+     * Sends an HTML account statement email to the account owner.
+     * Called via AJAX from the account page.
+     */
+    public function send_statement() {
+        if (!auth_check() || !is_admin()) {
+            echo json_encode(['success' => false, 'message' => 'Unauthorised.']);
+            return;
+        }
+        $post_id = $this->input->post('id', true);
+        if (empty($post_id)) {
+            echo json_encode(['success' => false, 'message' => 'Account ID missing.']);
+            return;
+        }
+        $post = $this->post_model->get_post_by_id($post_id);
+        if (!$post) {
+            echo json_encode(['success' => false, 'message' => 'Account not found.']);
+            return;
+        }
+        // Load all approved transactions for this account
+        $this->db->where('account_id', $post_id);
+        $this->db->order_by('trans_id', 'ASC');
+        $transactions = $this->db->get('transaction')->result();
+
+        $recipient_email = !empty($post->owner->email) ? $post->owner->email : null;
+        if (empty($recipient_email)) {
+            echo json_encode(['success' => false, 'message' => 'Client has no email address on file.']);
+            return;
+        }
+
+        $data = [
+            'subject'      => 'Your Account Statement — ' . $this->settings->application_name,
+            'to'           => $recipient_email,
+            'template_path'=> 'email/email_statement',
+            'post'         => $post,
+            'transactions' => $transactions,
+            'settings'     => $this->settings,
+        ];
+
+        $result = $this->email_model->send_email($data);
+        if ($result) {
+            echo json_encode(['success' => true, 'message' => 'Statement sent to ' . $recipient_email]);
+        } else {
+            echo json_encode(['success' => false, 'message' => 'Failed to send email. Check your mail settings.']);
+        }
+    }
 }

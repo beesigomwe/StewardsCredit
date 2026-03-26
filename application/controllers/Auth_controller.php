@@ -25,6 +25,8 @@ class Auth_controller extends Home_Core_Controller{
 
 	/**
 	 * Login Post
+	 * SECURITY: Added brute-force rate limiting.
+	 * After 5 failed attempts from the same IP, the account is locked for 15 minutes.
 	 */
 	public function login_post(){
 
@@ -32,6 +34,27 @@ class Auth_controller extends Home_Core_Controller{
 		if ($this->auth_model->is_logged_in() == true) {
 			redirect(lang_base_url());
 		}
+
+		// --- RATE LIMITING ---
+		$ip = $this->input->ip_address();
+		$lockout_key   = 'login_lockout_' . md5($ip);
+		$attempts_key  = 'login_attempts_' . md5($ip);
+		$max_attempts  = 5;
+		$lockout_time  = 900; // 15 minutes in seconds
+
+		if ($this->session->userdata($lockout_key)) {
+			$locked_at = (int)$this->session->userdata($lockout_key);
+			if (time() - $locked_at < $lockout_time) {
+				$remaining = $lockout_time - (time() - $locked_at);
+				$this->session->set_flashdata('error', 'Too many failed login attempts. Please try again in ' . ceil($remaining / 60) . ' minute(s).');
+				redirect($this->agent->referrer());
+				return;
+			} else {
+				// Lockout expired — reset
+				$this->session->unset_userdata([$lockout_key, $attempts_key]);
+			}
+		}
+		// --- END RATE LIMITING ---
 
 		//validate inputs
 		$this->form_validation->set_rules('username', trans("username"), 'required|xss_clean|max_length[150]');
@@ -52,12 +75,21 @@ class Auth_controller extends Home_Core_Controller{
 				redirect($this->agent->referrer());
 
 			} elseif ($result == "success") {
+				// Successful login — clear any rate limiting data
+				$this->session->unset_userdata([$lockout_key, $attempts_key]);
 				$redirect = $this->input->post('redirect_url', true);
 				redirect($redirect);
 			} else {
-				//error
-				$this->session->set_flashdata('form_data', $this->auth_model->input_values());
-				$this->session->set_flashdata('error', trans("login_error"));
+				// Failed login — increment attempt counter
+				$attempts = (int)$this->session->userdata($attempts_key) + 1;
+				$this->session->set_userdata($attempts_key, $attempts);
+				if ($attempts >= $max_attempts) {
+					$this->session->set_userdata($lockout_key, time());
+					$this->session->set_flashdata('error', 'Too many failed login attempts. Your IP has been locked for 15 minutes.');
+				} else {
+					$this->session->set_flashdata('form_data', $this->auth_model->input_values());
+					$this->session->set_flashdata('error', trans("login_error") . ' (' . $attempts . '/' . $max_attempts . ' attempts)');
+				}
 				redirect($this->agent->referrer());
 			}
 

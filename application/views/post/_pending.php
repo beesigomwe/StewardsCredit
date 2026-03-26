@@ -54,7 +54,7 @@
 									<?php }else{ ?>
 										<a class="dropdown-item" href="<?= base_url() ?>transaction/<?= $item->id ?>"><i class="dropdown-icon fe fe-printer"></i> View Transaction</a>
 									<?php } ?>
-									<a class="dropdown-item" href="javascript:void(0)"><i class="dropdown-icon fe fe-edit"></i> Edit Transaction</a>
+									<a class="dropdown-item" href="javascript:void(0)" onclick="openEditTransactionModal('<?= $item->id; ?>')"><i class="dropdown-icon fe fe-edit"></i> Edit Transaction</a>
 									<?php if (auth_check() && is_admin()){ ?>
 										<div role="separator" class="dropdown-divider"></div>
 										<a class="dropdown-item color-red" href="javascript:void(0)" onclick="delete_transaction('admin_controller/delete_comment_post','<?= $item->id; ?>','<?= trans("confirm_comment"); ?>');"><i class="dropdown-icon fe fe-trash"></i> Delete Transaction</a>
@@ -79,3 +79,112 @@
 
 		</tbody>
 	</table>
+<!-- ============================================================
+     EDIT TRANSACTION MODAL
+     Allows admins to update the amount, date, and note of a
+     pending (unapproved) transaction before it is approved.
+     ============================================================ -->
+<div class="modal fade" id="editTransactionModal" tabindex="-1" role="dialog" aria-labelledby="editTransactionModalLabel" aria-hidden="true">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="editTransactionModalLabel"><i class="fe fe-edit"></i> Edit Pending Transaction</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted small mb-3">Only <strong>pending</strong> transactions can be edited. Approved transactions are locked to preserve the audit trail.</p>
+                <input type="hidden" id="edit_txn_id">
+                <div class="form-group">
+                    <label>Amount</label>
+                    <input type="number" step="0.01" id="edit_txn_amount" class="form-control" placeholder="Enter new amount">
+                </div>
+                <div class="form-group">
+                    <label>Transaction Date</label>
+                    <input type="date" id="edit_txn_date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label>Note / Narration</label>
+                    <textarea id="edit_txn_note" class="form-control" rows="2" placeholder="Optional note"></textarea>
+                </div>
+                <div id="edit_txn_feedback" class="alert d-none"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="submitEditTransaction()">
+                    <i class="fe fe-save"></i> Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function openEditTransactionModal(id) {
+    // Reset feedback
+    var fb = document.getElementById('edit_txn_feedback');
+    fb.className = 'alert d-none';
+    fb.textContent = '';
+
+    // Fetch the transaction data via AJAX
+    fetch('<?= base_url('admin_controller/get_transaction_json') ?>?id=' + id)
+        .then(function(r){ return r.json(); })
+        .then(function(res) {
+            if (res.success) {
+                document.getElementById('edit_txn_id').value     = res.data.id;
+                document.getElementById('edit_txn_amount').value = res.data.amount;
+                document.getElementById('edit_txn_date').value   = res.data.trans_date;
+                document.getElementById('edit_txn_note').value   = res.data.comment || '';
+                $('#editTransactionModal').modal('show');
+            } else {
+                alert(res.message || 'Could not load transaction.');
+            }
+        })
+        .catch(function(e){ alert('Network error: ' + e); });
+}
+
+function submitEditTransaction() {
+    var id         = document.getElementById('edit_txn_id').value;
+    var amount     = document.getElementById('edit_txn_amount').value;
+    var trans_date = document.getElementById('edit_txn_date').value;
+    var note       = document.getElementById('edit_txn_note').value;
+    var fb         = document.getElementById('edit_txn_feedback');
+
+    if (!amount || !trans_date) {
+        fb.className = 'alert alert-danger';
+        fb.textContent = 'Amount and date are required.';
+        return;
+    }
+
+    var formData = new FormData();
+    formData.append('id', id);
+    formData.append('amount', amount);
+    formData.append('trans_date', trans_date);
+    formData.append('note', note);
+    // CodeIgniter CSRF token
+    var csrfName  = '<?= $this->security->get_csrf_token_name(); ?>';
+    var csrfHash  = '<?= $this->security->get_csrf_hash(); ?>';
+    formData.append(csrfName, csrfHash);
+
+    fetch('<?= base_url('admin_controller/edit_transaction_post') ?>', {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(res) {
+        if (res.success) {
+            fb.className = 'alert alert-success';
+            fb.textContent = res.message;
+            setTimeout(function(){ location.reload(); }, 1200);
+        } else {
+            fb.className = 'alert alert-danger';
+            fb.textContent = res.message || 'Update failed.';
+        }
+    })
+    .catch(function(e){
+        fb.className = 'alert alert-danger';
+        fb.textContent = 'Network error: ' + e;
+    });
+}
+</script>

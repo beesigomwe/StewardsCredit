@@ -12,8 +12,30 @@
             <h3 class="card-title"><?= trans('users'); ?></h3>
           </div>
 
+          <!-- CLIENT SEARCH BAR -->
+          <div class="card-body border-bottom py-2">
+            <div class="row align-items-center">
+              <div class="col">
+                <div class="input-group">
+                  <div class="input-group-prepend">
+                    <span class="input-group-text"><i class="fe fe-search"></i></span>
+                  </div>
+                  <input type="text" id="client-search-input" class="form-control" placeholder="Search clients by name, email, or mobile..." autocomplete="off">
+                </div>
+              </div>
+              <div class="col-auto">
+                <a href="<?= base_url('post_controller/add_post?type=loan') ?>" class="btn btn-success btn-sm">
+                  <i class="fe fe-plus"></i> New Loan
+                </a>
+                <a href="<?= base_url('post_controller/add_post?type=deposit') ?>" class="btn btn-primary btn-sm ml-1">
+                  <i class="fe fe-plus"></i> New Deposit
+                </a>
+              </div>
+            </div>
+          </div>
+
           <div class="table-responsive">
-            <table class="table table-striped table table-hover table-outline table-vcenter text-nowrap card-table" >
+            <table id="clients-table" class="table table-striped table table-hover table-outline table-vcenter text-nowrap card-table" >
               <thead>
                 <tr>
                   <th class="text-center w-1"><i class="icon-people"></i></th>
@@ -147,3 +169,19 @@
 
         </div>
       </div>
+<script>
+// Live client search — filters the table rows client-side as the user types.
+// For very large datasets (1000+ clients), replace with an AJAX endpoint.
+(function() {
+    var input = document.getElementById('client-search-input');
+    if (!input) return;
+    input.addEventListener('keyup', function() {
+        var filter = this.value.toLowerCase().trim();
+        var rows = document.querySelectorAll('#clients-table tbody tr');
+        rows.forEach(function(row) {
+            var text = row.textContent.toLowerCase();
+            row.style.display = (filter === '' || text.indexOf(filter) > -1) ? '' : 'none';
+        });
+    });
+})();
+</script>

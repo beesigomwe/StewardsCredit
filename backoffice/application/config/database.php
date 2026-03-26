@@ -73,12 +73,15 @@ defined('BASEPATH') OR exit('No direct script access allowed');
 $active_group = 'default';
 $query_builder = TRUE;
 
+// SECURITY: Credentials are now read from environment variables.
+// Set these in your server's environment (e.g., Apache SetEnv, Nginx fastcgi_param, or .env file).
+// Fallback values are provided for local development ONLY.
 $db['default'] = array(
 	'dsn'	=> '',
-	'hostname' => 'localhost',
-    'username' => 'stewards',
-    'password' => 'GreatFinancialGrace',
-    'database' => 'stewards',
+	'hostname' => getenv('DB_HOSTNAME') ?: 'localhost',
+	'username' => getenv('DB_USERNAME') ?: 'stewards',
+	'password' => getenv('DB_PASSWORD') ?: '',
+	'database' => getenv('DB_DATABASE') ?: 'stewards',
 	'dbdriver' => 'mysqli',
 	'dbprefix' => '',
 	'pconnect' => FALSE,
@@ -92,5 +95,5 @@ $db['default'] = array(
 	'compress' => FALSE,
 	'stricton' => FALSE,
 	'failover' => array(),
-	'save_queries' => TRUE
+	'save_queries' => (ENVIRONMENT !== 'production')
 );
